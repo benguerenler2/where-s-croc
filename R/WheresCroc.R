@@ -4,6 +4,12 @@
 # Ankur Shukla - T-NUMBER
 # Diego Castillo - 911206-T438
 
+# TODO: Implement
+hmmWC=function(moveInfo,readings,positions,edges,probs) {
+  browser()
+  return (randomWC(moveInfo,readings,positions,edges,probs))
+}
+
 #' @export
 randomWC=function(moveInfo,readings,positions,edges,probs) {
   moveInfo$moves=c(sample(getOptions(positions[3],edges),1),0)
