@@ -1,6 +1,12 @@
+# Authors:
+# Arianna Delsante - 940929-T300
+# Bengü Erenler - 940519-T520
+# Ankur Shukla - T-NUMBER
+# Diego Castillo - 911206-T438
+
 #' @export
 randomWC=function(moveInfo,readings,positions,edges,probs) {
-  moveInfo$moves=c(sample(getOptions(positions[3],edges),1),0)  
+  moveInfo$moves=c(sample(getOptions(positions[3],edges),1),0)
   return(moveInfo)
 }
 
@@ -20,7 +26,7 @@ manualWC=function(moveInfo,readings,positions,edges,probs) {
   }
   print("Move 2 options (plus 0 for search):")
   print(options)
-  mv2=readline("Move 2: ")    
+  mv2=readline("Move 2: ")
   if (mv2=="q") {stop()}
   if (!mv1 %in% options && mv1 != 0) {
     warning ("Invalid move. Search ('0') specified.")
@@ -31,38 +37,38 @@ manualWC=function(moveInfo,readings,positions,edges,probs) {
 }
 
 #' Run Where's Croc
-#' 
-#' Runs the Where's Croc game. In this game, you are a ranger in an Australian national park. 
+#'
+#' Runs the Where's Croc game. In this game, you are a ranger in an Australian national park.
 #' This park consists of a number of waterholes, some of which are connected to each other.
-#' There is a crocodile in the park called 'Croc'. Croc has been fitted with sensors that record 
-#' the salinity, phosphate and nitrogen levels in the water where he is swimming. He was also 
+#' There is a crocodile in the park called 'Croc'. Croc has been fitted with sensors that record
+#' the salinity, phosphate and nitrogen levels in the water where he is swimming. He was also
 #' fitted with a sensor that records his position, but that has broken.
 #' Your task is to find Croc using the available information. To aid in this you have information
-#' about the probability distributions for different salinity, phosphate and nitrogen levels in 
+#' about the probability distributions for different salinity, phosphate and nitrogen levels in
 #' different waterholes.
 #' There are also two tourists in the park. Both the tourists and Croc walk randomly, each turn
 #' moving to one of the neighboring waterholes from where they are or staying still. All moves
 #' are equally likely.
 #' If Croc and a tourist end up on the same waterhole, Croc will eat the tourist. If you search
-#' the waterhole you are on when Croc is there, you have found Croc and win the game. 
+#' the waterhole you are on when Croc is there, you have found Croc and win the game.
 #' Your score is the number of turns it takes to find Croc.
 #' To play manually pass manualWC
 #' as the makeMoves function and enter the appropriate numbers to make moves.
 #' @param makeMoves Your function that takes five arguments: (1) A list of information for the move.
-#' This has two fiels. The first is a vector of numbers called 'moves', where you will enter 
+#' This has two fiels. The first is a vector of numbers called 'moves', where you will enter
 #' the moves you want to make. You should
-#' enter two moves (so you can move to a neighboring waterhole and search). Valid moves are the 
+#' enter two moves (so you can move to a neighboring waterhole and search). Valid moves are the
 #' numbers of a neighboring or current waterhole or '0' which means you will search your current
 #' waterhole for Croc. The second field is a list called
-#' 'mem' that you can use to store information you want to remember from turn to turn. (2) A 
-#' vector giving the salinity, phosphate and nitrogen reading from Croc sensors at his current 
+#' 'mem' that you can use to store information you want to remember from turn to turn. (2) A
+#' vector giving the salinity, phosphate and nitrogen reading from Croc sensors at his current
 #' location. (3) A vector giving the positions of the two tourists and yourself. If a tourist
-#' has just been eaten by Croc that turn, the position will be multiplied by -1. If a tourist 
-#' was eaten by Croc in a previous turn, then the position will be NA. (4) a matrix giving the 
+#' has just been eaten by Croc that turn, the position will be multiplied by -1. If a tourist
+#' was eaten by Croc in a previous turn, then the position will be NA. (4) a matrix giving the
 #' edges paths between waterholes (edges) present. (5) a list of three matrices giving the mean
 #' and standard deviation of readings for salinity, phosphate and nitrogen respectively
 #' at each waterhole.
-#' Your function should return the first argument passed with an updated moves vector 
+#' Your function should return the first argument passed with an updated moves vector
 #' and any changes to the 'mem' field you wish to access later on.
 #' @param showCroc A Boolean value specifying whether you want Croc to be shown on the gameboard.
 #' Note that you are not permitted to use this visual information when you are scored.
@@ -96,9 +102,9 @@ runWheresCroc=function(makeMoves,showCroc=F,pause=1) {
       positions[3]=-positions[3]
     }
     plotGameboard(points,edges,move,positions,showCroc)
-    
+
     Sys.sleep(pause)
-    
+
     readings=getReadings(positions[1],probs)
     moveInfo=makeMoves(moveInfo,readings,positions[2:4],edges,probs)
     if (length(moveInfo$moves)!=2) {
@@ -116,7 +122,7 @@ runWheresCroc=function(makeMoves,showCroc=F,pause=1) {
         } else {
           warning("Invalid move.")
         }
-      }      
+      }
     }
   }
 }
@@ -238,7 +244,7 @@ getEdges=function() {
   edges=rbind(edges,c(37,39))
   edges=rbind(edges,c(37,40))
   edges=rbind(edges,c(38,39))
-  
+
   return (edges)
 }
 
@@ -278,7 +284,7 @@ plotGameboard=function(points,edges,move,positions,showCroc) {
     }
   points(points[as.numeric(positions[4]),1],points[as.numeric(positions[4]),2],col="green",pch=15,cex=4)
   if (showCroc) {
-    points(points[as.numeric(positions[1]),1],points[as.numeric(positions[1]),2],col="red",pch=15,cex=4)      
+    points(points[as.numeric(positions[1]),1],points[as.numeric(positions[1]),2],col="red",pch=15,cex=4)
   }
   text(points[,1]+.4, points[,2], labels=as.character(1:40))
 }
