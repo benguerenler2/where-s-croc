@@ -1,6 +1,6 @@
 # Authors:
 # Arianna Delsante - 940929-T300
-# Bengü Erenler - 940519-T520
+# Beng?? Erenler - 940519-T520
 # Diego Castillo - 911206-T438
 
 # Return the previous state for the probability of the Croc being at
@@ -34,13 +34,36 @@ createObservations=function(readings, probs, numOfWaterHoles) {
   return (matrix)
 }
 
+# Transition matrix created with probabilities
+createTransitionMatrix = function(points,edges,probs) {
+  # Build 40 x 40 empty matrix.
+  nrow = 40
+  ncol = 40
+  matrix = matrix(0, nrow, ncol)
+  for (i in 1:nrow){
+    # To find reachable waterholes
+    reachableWaterholes = getOptions(i, edges)
+    # Count total number of reachableWatherHoles
+    totalNumOfReachableWaterholes = length(getOptions(i,edges))
+    # setProb of each reachable waterhole to 1/totalNumOfReachableWaterholes
+    prob = 1/totalNumOfReachableWaterholes # 1/4
+    for (j in 1:ncol) {
+      for(k in 1:totalNumOfReachableWaterholes) {
+        if((j == reachableWaterholes[k])) {
+          matrix[i, j] <- prob
+        }
+      }
+    }
+  }
+  return (matrix)
+}
+
 hmmWC=function(moveInfo, readings, positions, edges, probs) {
   # Initialize previous state, transition, and observation matrices
   numOfWaterHoles = dim(probs$salinity)[1]
   moveInfo$mem$prevState = getPrevState(moveInfo$mem$prevState, numOfWaterHoles)
-  transitions = matrix(0, nrow=numOfWaterHoles, ncol=numOfWaterHoles)
+  transitions = createTransitionMatrix(points,edges,probs)
   observations = createObservations(readings, probs, numOfWaterHoles)
-
   # Compute next possible state
   nextState = moveInfo$mem$prevState %*% transitions %*% observations
 
