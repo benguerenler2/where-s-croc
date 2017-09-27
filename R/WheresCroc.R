@@ -1,17 +1,14 @@
 # Authors:
 # Arianna Delsante - 940929-T300
-# Beng?? Erenler - 940519-T520
+# Bengü Erenler - 940519-T520
 # Diego Castillo - 911206-T438
+
+###############################################
+#############Inference Related Code############
+###############################################
 
 # Return the previous state for the probability of the Croc being at
 # any of the available waterholes
-# TODO: Use information from backpackers to improve state knowledge
-#     - If a backpacker's position is negative, no need to do HMM, we already know
-#       where the Croc is at
-#     - If a backpacker's positions is 'NA', we need to update the previous state as we
-#       now know where the Croc was really at
-#     - How to deal with 'NA' positions that were not in the previous turn (i.e. the backpacker
-#       was eaten 5 turns ago - not previous state anymore)?
 getPrevState=function(prevState, numOfWaterHoles) {
   if(isTRUE(is.null(prevState))) {
     matrix = matrix(1/numOfWaterHoles, nrow=1, ncol=numOfWaterHoles)
@@ -20,65 +17,236 @@ getPrevState=function(prevState, numOfWaterHoles) {
   return (prevState)
 }
 
-# Create an observation matrix given readings of the current position
-# of the Croc and a normal distribution of the readings throughout all
-# of the waterholes
-createObservations=function(readings, probs, numOfWaterHoles) {
+# Create the transition matrix for each available waterhole
+createTransitionMatrix = function(edges, numOfWaterHoles) {
   matrix = matrix(0, nrow=numOfWaterHoles, ncol=numOfWaterHoles)
-  for (i in 1:numOfWaterHoles) {
-    salinityDNorm = dnorm(readings[1], probs$salinity[i,1], probs$salinity[i,2])
-    phosphateDNorm = dnorm(readings[2], probs$phosphate[i,1], probs$phosphate[i,2])
-    nitrogenDNorm = dnorm(readings[3], probs$nitrogen[i,1], probs$nitrogen[i,2])
-    matrix[i,i] = salinityDNorm * phosphateDNorm * nitrogenDNorm
-  }
-  return (matrix)
-}
-
-# Transition matrix created with probabilities
-createTransitionMatrix = function(points,edges,probs) {
-  # Build 40 x 40 empty matrix.
-  nrow = 40
-  ncol = 40
-  matrix = matrix(0, nrow, ncol)
-  for (i in 1:nrow){
-    # To find reachable waterholes
-    reachableWaterholes = getOptions(i, edges)
-    # Count total number of reachableWatherHoles
-    totalNumOfReachableWaterholes = length(getOptions(i,edges))
-    # setProb of each reachable waterhole to 1/totalNumOfReachableWaterholes
+  for (waterhole in 1:numOfWaterHoles){
+    neighbors = getOptions(waterhole, edges)
+    totalNumOfReachableWaterholes = length(getOptions(waterhole, edges))
     prob = 1/totalNumOfReachableWaterholes # 1/4
-    for (j in 1:ncol) {
-      for(k in 1:totalNumOfReachableWaterholes) {
-        if((j == reachableWaterholes[k])) {
-          matrix[i, j] <- prob
-        }
-      }
+    for (neighbor in neighbors) {
+      matrix[waterhole, neighbor] = prob
     }
   }
   return (matrix)
 }
 
-hmmWC=function(moveInfo, readings, positions, edges, probs) {
+# Create an observation matrix given readings of the current position
+# of the Croc and a normal distribution of the readings throughout all
+# of the waterholes
+createObservations=function(readings, probs, numOfWaterHoles) {
+  matrix = matrix(0, nrow=numOfWaterHoles, ncol=numOfWaterHoles)
+  for (waterhole in 1:numOfWaterHoles) {
+    salinityDNorm = dnorm(readings[1], probs$salinity[waterhole,1], probs$salinity[waterhole,2])
+    phosphateDNorm = dnorm(readings[2], probs$phosphate[waterhole,1], probs$phosphate[waterhole,2])
+    nitrogenDNorm = dnorm(readings[3], probs$nitrogen[waterhole,1], probs$nitrogen[waterhole,2])
+    matrix[waterhole,waterhole] = salinityDNorm * phosphateDNorm * nitrogenDNorm
+  }
+  return (matrix)
+}
+
+# Use the forward algorithm to provide a distribution over the system
+# and select the waterhole where there's a highest chance the Croc is at
+getMostProbableWaterhole=function(moveInfo, readings, edges, probs) {
   # Initialize previous state, transition, and observation matrices
   numOfWaterHoles = dim(probs$salinity)[1]
   moveInfo$mem$prevState = getPrevState(moveInfo$mem$prevState, numOfWaterHoles)
-  transitions = createTransitionMatrix(points,edges,probs)
+  transitions = createTransitionMatrix(edges, numOfWaterHoles)
   observations = createObservations(readings, probs, numOfWaterHoles)
+
   # Compute next possible state
   nextState = moveInfo$mem$prevState %*% transitions %*% observations
 
-  # Get initial and goal positions for search
-  from = positions[3]
-  goal = which.max(nextState)
-
-  # TODO: Search
-
-  browser()
-
-  # This turn state becomes next turn previous state
+  # This turn state will become next turn previous state
   moveInfo$mem$prevState = nextState
 
-  return (randomWC(moveInfo,readings,positions,edges,probs))
+  return (which.max(nextState))
+}
+
+# TODO: Use information from backpackers to improve state knowledge
+#     - If a backpacker's position is negative, no need to compute forward algorithm, we already know
+#       where the Croc is at
+#     - If a backpacker's positions is 'NA', we need to update the previous state as we
+#       now know where the Croc was really at (on the previous turn)
+#     - How to deal with 'NA' positions that were not in the previous turn (i.e. the backpacker
+#       was eaten 5 turns ago - not previous state anymore)?
+hmmWC=function(moveInfo, readings, positions, edges, probs) {
+  # Get initial and goal positions for search
+  from = positions[3]
+  goal = getMostProbableWaterhole(moveInfo, readings, edges, probs)
+
+  path = bestFirstSearch(from, goal, edges, getPoints())
+  moveInfo$moves = c(generateNextMove(path), 0)
+  return (moveInfo)
+}
+
+averageTest <- function(tests, showCroc = FALSE, pause = 0, doPlot = FALSE){
+  sum = 0
+  for (i in 1:tests) {
+    sum=sum+runWheresCroc(hmmWC, showCroc, pause, doPlot)
+    if(i%%10==0){
+      print(i)
+      print(sum/i)
+    }
+  }
+  print(sum/i)
+  return(0)
+}
+
+###############################################
+##############Search Related Code##############
+###############################################
+
+# A priority queue which allows to insert elements
+# and order them by priority
+# Source: http://rosettacode.org/wiki/Priority_queue#R
+PriorityQueue <- function() {
+  queueKeys <<- queueValues <<- NULL
+  insert <- function(key, value) {
+    # If node already exists on queue, and this new addition is better,
+    # delete previous one and insert this new one instead
+    index = getValueIndex(value)
+    if(length(index) > 0) {
+      if(isTRUE(key < queueKeys[[index]])) {
+        queueKeys <<- queueKeys[-index]
+        queueValues <<- queueValues[-index]
+      } else {
+        # Ignore it, we already have a cheaper path
+        return (-1)
+      }
+    }
+
+    # Insert new value in queue
+    temp <- c(queueKeys, key)
+    ord <- order(temp)
+    queueKeys <<- temp[ord]
+    queueValues <<- c(queueValues, list(value))[ord]
+  }
+  pop <- function() {
+    head <- queueValues[[1]]
+    queueValues <<- queueValues[-1]
+    queueKeys <<- queueKeys[-1]
+    return (head)
+  }
+  empty <- function() length(queueKeys) == 0
+  getValueIndex <- function(value) which(queueValues %in% list(value) == TRUE)
+  list(insert = insert, pop = pop, empty = empty)
+}
+
+# A simple lists which allows to insert elements on it
+# and verity if a particular element exists or not
+List <- function() {
+  listValues <<- NULL
+  insert <- function(value) listValues <<- c(listValues, list(value))
+  exists <- function(value) isTRUE(which(listValues %in% list(value) == TRUE) > 0)
+  list(insert = insert, exists = exists)
+}
+
+# Returns the Manhattan distance between two locations
+getManhattanDistance=function(from, to) {
+  return (abs(from[1] - to[1]) + abs(from[2] - to[2]))
+}
+
+# Return the Euclidean distance between two locations
+getEuclideanDistance=function(from, to) {
+  return (sqrt((from[1] - to[1])^2 + (from[2] - to[2])^2))
+}
+
+# Return the neighbors of a particular node
+getNeighbors=function(node, edges) {
+  neighbors = getOptions(node, edges)
+  # A node is not a neighbor of itself
+  return (neighbors[neighbors[] != node])
+}
+
+# Return true if node is goal, false otherwise
+isGoal=function(node, goal) {
+  return (node == goal)
+}
+
+# Transform a vector representation of a node to a string
+transformNodeToString=function(node) {
+  return (paste(node))
+}
+
+# Transform a string representation of a node to a vector
+transformStringToNode=function(nodeAsString) {
+  return (c(as.integer(nodeAsString)))
+}
+
+# Returns the path from an initial position to the goal position given
+# the path visited by the algorithm
+generatePath=function(from, to, path) {
+  goal = transformNodeToString(from)
+  curr = transformNodeToString(to)
+
+  # Build path visited by traversing the path variable
+  # from goal to initial position (in reverse order)
+  vectors = list(c(to))
+  while (curr != goal) {
+    node = transformStringToNode(path[[curr]])
+    vectors = c(vectors, list(node))
+    curr = path[[curr]]
+  }
+
+  # Return path from initial position to goal
+  return (rev(vectors))
+}
+
+# Return the path from initial position to a goal using the best-first
+# search algorithm
+bestFirstSearch=function(from, goal, edges, locations) {
+  # Initialize visited, frontier, and path lists
+  visited = List()
+  frontier = PriorityQueue()
+  path = list()
+
+  # Put the starting location on the frontier (cost 0 is fine)
+  frontier$insert(0, from)
+
+  while (!frontier$empty()) {
+    # Get node with the least f on the frontier
+    node = frontier$pop()
+
+    # Return the visited path + current node as path to goal
+    if(isGoal(node, goal)) {
+      return (generatePath(from, goal, path))
+    }
+
+    neighbors = getNeighbors(node, edges)
+    for (neighbor in neighbors) {
+      # Only search neighbors which haven't already being visited
+      if(visited$exists(neighbor)) {
+        next
+      } else {
+        # Temporarily save visited path towards this neighbor
+        tempPath = path
+        tempPath[transformNodeToString(neighbor)] = transformNodeToString(node)
+
+        # Attempt to add neighbor to frontier
+        cost = getManhattanDistance(locations[from,], locations[neighbor,]) + getEuclideanDistance(locations[neighbor,], locations[goal,])
+        inserted = frontier$insert(cost, neighbor)
+
+        # Add neighbor to path only if it was inserted in the frontier
+        wasInserted = length(inserted) != 1 || inserted[[1]][1] != -1
+        if (isTRUE(wasInserted)) {
+          path[transformNodeToString(neighbor)] = transformNodeToString(node)
+        }
+      }
+    }
+
+    # Keep track of visited nodes
+    visited$insert(node)
+  }
+}
+
+# Given a path, return the best next move towards goal
+generateNextMove=function(path) {
+  if(isTRUE(length(path) == 1)) {
+    return (path[[1]])
+  } else {
+    return (path[[2]])
+  }
 }
 
 #' @export
@@ -152,7 +320,7 @@ manualWC=function(moveInfo,readings,positions,edges,probs) {
 #' @param pause The pause period between moves. Ignore this.
 #' @return A string describing the outcome of the game.
 #' @export
-runWheresCroc=function(makeMoves,showCroc=F,pause=1) {
+runWheresCroc=function(makeMoves,showCroc=F,pause=1, doPlot=TRUE) {
   positions=sample(1:40,4) # Croc, BP1, BP2, Player
   points=getPoints()
   edges=getEdges()
@@ -178,7 +346,10 @@ runWheresCroc=function(makeMoves,showCroc=F,pause=1) {
     if (!is.na(positions[3]) && positions[3]==positions[1]) {
       positions[3]=-positions[3]
     }
-    plotGameboard(points,edges,move,positions,showCroc)
+
+    if(doPlot) {
+      plotGameboard(points,edges,move,positions,showCroc)
+    }
 
     Sys.sleep(pause)
 
