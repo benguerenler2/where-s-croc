@@ -34,32 +34,30 @@ createObservations=function(readings, probs, numOfWaterHoles) {
   return (matrix)
 }
 
-#Transition matrix created with probabilities
-createTransitionMatrix = function(points,edges,probs)
-{
-  #Build 40 x 40 empty matrix.
-  nrow=40
-  ncol=40
-  B = matrix(0, nrow,ncol)
-  #TODO make a loop for getting the probs and write in the matrix. nested loops
+# Transition matrix created with probabilities
+createTransitionMatrix = function(points,edges,probs) {
+  # Build 40 x 40 empty matrix.
+  nrow = 40
+  ncol = 40
+  matrix = matrix(0, nrow, ncol)
   for (i in 1:nrow){
-    #To find reachable waterholes
-    reachableWaterholes=getOptions(i,edges) #2 4 6 1 
-    #Count total number of reachableWatherHoles
-    totalNumOfReachableWaterholes = length(getOptions(i,edges)) # = 4
-    #setProb of each reachable waterhole to 1/totalNumOfReachableWaterholes
-    setProb = 1/totalNumOfReachableWaterholes # 1/4
-    for (j in 1:ncol){
-      for(k in 1:totalNumOfReachableWaterholes){
-        if((j == reachableWaterholes[k]))
-        {
-          B[i,j] <-setProb
+    # To find reachable waterholes
+    reachableWaterholes = getOptions(i, edges)
+    # Count total number of reachableWatherHoles
+    totalNumOfReachableWaterholes = length(getOptions(i,edges))
+    # setProb of each reachable waterhole to 1/totalNumOfReachableWaterholes
+    prob = 1/totalNumOfReachableWaterholes # 1/4
+    for (j in 1:ncol) {
+      for(k in 1:totalNumOfReachableWaterholes) {
+        if((j == reachableWaterholes[k])) {
+          matrix[i, j] <- prob
         }
       }
     }
   }
-  return (B)
+  return (matrix)
 }
+
 hmmWC=function(moveInfo, readings, positions, edges, probs) {
   # Initialize previous state, transition, and observation matrices
   numOfWaterHoles = dim(probs$salinity)[1]
