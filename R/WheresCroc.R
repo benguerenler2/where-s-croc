@@ -3,9 +3,26 @@
 # Bengü Erenler - 940519-T520
 # Diego Castillo - 911206-T438
 
-# Create an observation matrix given readings of the current
-# position of the Croc and a normal distribution of the readings
-# throughout all of the waterholes
+# Return the previous state for the probability of the Croc being at
+# any of the available waterholes
+# TODO: Use information from backpackers to improve state knowledge
+#     - If a backpacker's position is negative, no need to do HMM, we already know
+#       where the Croc is at
+#     - If a backpacker's positions is 'NA', we need to update the previous state as we
+#       now know where the Croc was really at
+#     - How to deal with 'NA' positions that were not in the previous turn (i.e. the backpacker
+#       was eaten 5 turns ago - not previous state anymore)?
+getPrevState=function(prevState, numOfWaterHoles) {
+  if(isTRUE(is.null(prevState))) {
+    matrix = matrix(1/numOfWaterHoles, nrow=1, ncol=numOfWaterHoles)
+    return (matrix)
+  }
+  return (prevState)
+}
+
+# Create an observation matrix given readings of the current position
+# of the Croc and a normal distribution of the readings throughout all
+# of the waterholes
 createObservations=function(readings, probs, numOfWaterHoles) {
   matrix = matrix(0, nrow=numOfWaterHoles, ncol=numOfWaterHoles)
   for (i in 1:numOfWaterHoles) {
@@ -17,13 +34,27 @@ createObservations=function(readings, probs, numOfWaterHoles) {
   return (matrix)
 }
 
-# TODO: Implement
-hmmWC=function(moveInfo,readings,positions,edges,probs) {
+hmmWC=function(moveInfo, readings, positions, edges, probs) {
+  # Initialize previous state, transition, and observation matrices
   numOfWaterHoles = dim(probs$salinity)[1]
-  prevState = NULL
-  transitions = NULL
+  moveInfo$mem$prevState = getPrevState(moveInfo$mem$prevState, numOfWaterHoles)
+  transitions = matrix(0, nrow=numOfWaterHoles, ncol=numOfWaterHoles)
   observations = createObservations(readings, probs, numOfWaterHoles)
-  # return (prevState * transitions * observations)
+
+  # Compute next possible state
+  nextState = moveInfo$mem$prevState %*% transitions %*% observations
+
+  # Get initial and goal positions for search
+  from = positions[3]
+  goal = which.max(nextState)
+
+  # TODO: Search
+
+  browser()
+
+  # This turn state becomes next turn previous state
+  moveInfo$mem$prevState = nextState
+
   return (randomWC(moveInfo,readings,positions,edges,probs))
 }
 
