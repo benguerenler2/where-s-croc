@@ -64,6 +64,9 @@ getMostProbableWaterhole=function(moveInfo, readings, edges, probs) {
 }
 
 # TODO: Use information from backpackers to improve state knowledge
+#     - The initial previous state is not 1/40 for all waterholes. We need to check if backpackers are both 
+#        alive or not and compute accordingly (if both packares are alive, their waterholes prob is 0 and 
+#        1/38 for the rest and so on for other use-cases)
 #     - If a backpacker's position is negative, no need to compute forward algorithm, we already know
 #       where the Croc is at
 #     - If a backpacker's positions is 'NA', we need to update the previous state as we
