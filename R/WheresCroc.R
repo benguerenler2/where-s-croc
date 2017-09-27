@@ -3,9 +3,27 @@
 # Bengü Erenler - 940519-T520
 # Diego Castillo - 911206-T438
 
+# Create an observation matrix given readings of the current
+# position of the Croc and a normal distribution of the readings
+# throughout all of the waterholes
+createObservations=function(readings, probs, numOfWaterHoles) {
+  matrix = matrix(0, nrow=numOfWaterHoles, ncol=numOfWaterHoles)
+  for (i in 1:numOfWaterHoles) {
+    salinityDNorm = dnorm(readings[1], probs$salinity[i,1], probs$salinity[i,2])
+    phosphateDNorm = dnorm(readings[2], probs$phosphate[i,1], probs$phosphate[i,2])
+    nitrogenDNorm = dnorm(readings[3], probs$nitrogen[i,1], probs$nitrogen[i,2])
+    matrix[i,i] = salinityDNorm * phosphateDNorm * nitrogenDNorm
+  }
+  return (matrix)
+}
+
 # TODO: Implement
 hmmWC=function(moveInfo,readings,positions,edges,probs) {
-  browser()
+  numOfWaterHoles = dim(probs$salinity)[1]
+  prevState = NULL
+  transitions = NULL
+  observations = createObservations(readings, probs, numOfWaterHoles)
+  # return (prevState * transitions * observations)
   return (randomWC(moveInfo,readings,positions,edges,probs))
 }
 
