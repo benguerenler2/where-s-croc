@@ -142,11 +142,6 @@ List <- function() {
   list(insert = insert, exists = exists)
 }
 
-# Returns the Manhattan distance between two locations
-getManhattanDistance=function(from, to) {
-  return (abs(from[1] - to[1]) + abs(from[2] - to[2]))
-}
-
 # Return the Euclidean distance between two locations
 getEuclideanDistance=function(from, to) {
   return (sqrt((from[1] - to[1])^2 + (from[2] - to[2])^2))
@@ -224,8 +219,7 @@ bestFirstSearch=function(from, goal, edges, locations) {
         tempPath[transformNodeToString(neighbor)] = transformNodeToString(node)
 
         # Attempt to add neighbor to frontier
-        cost = getManhattanDistance(locations[from,], locations[neighbor,]) + getEuclideanDistance(locations[neighbor,], locations[goal,])
-        inserted = frontier$insert(cost, neighbor)
+        inserted = frontier$insert(getEuclideanDistance(locations[neighbor,], locations[goal,]), neighbor)
 
         # Add neighbor to path only if it was inserted in the frontier
         wasInserted = length(inserted) != 1 || inserted[[1]][1] != -1
