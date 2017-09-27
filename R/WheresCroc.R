@@ -75,7 +75,7 @@ hmmWC=function(moveInfo, readings, positions, edges, probs) {
   from = positions[3]
   goal = getMostProbableWaterhole(moveInfo, readings, edges, probs)
 
-  path = bestFirstSearch(from, goal, edges, getPoints())
+  path = aStarSearch(from, goal, edges, getPoints())
   moveInfo$moves = c(generateNextMove(path), 0)
   return (moveInfo)
 }
@@ -142,9 +142,19 @@ List <- function() {
   list(insert = insert, exists = exists)
 }
 
+# Returns the Manhattan distance between two locations
+getManhattanDistance=function(from, to) {
+  return (abs(from[1] - to[1]) + abs(from[2] - to[2]))
+}
+
 # Return the Euclidean distance between two locations
 getEuclideanDistance=function(from, to) {
   return (sqrt((from[1] - to[1])^2 + (from[2] - to[2])^2))
+}
+
+# Return the cost of an edge + a heuristic
+getCombinedCost=function(start, neighbor, goal) {
+  return (getManhattanDistance(start, neighbor) + getEuclideanDistance(neighbor, goal))
 }
 
 # Return the neighbors of a particular node
@@ -188,9 +198,11 @@ generatePath=function(from, to, path) {
   return (rev(vectors))
 }
 
-# Return the path from initial position to a goal using the best-first
-# search algorithm
-bestFirstSearch=function(from, goal, edges, locations) {
+# Perform A* search from current location to goal
+# Algorithm was implemented based off the following pseudo-codes:
+# 1. http://web.mit.edu/eranki/www/tutorials/search/
+# 2. https://en.wikipedia.org/wiki/A*_search_algorithm
+aStarSearch=function(from, goal, edges, locations) {
   # Initialize visited, frontier, and path lists
   visited = List()
   frontier = PriorityQueue()
@@ -219,7 +231,7 @@ bestFirstSearch=function(from, goal, edges, locations) {
         tempPath[transformNodeToString(neighbor)] = transformNodeToString(node)
 
         # Attempt to add neighbor to frontier
-        inserted = frontier$insert(getEuclideanDistance(locations[neighbor,], locations[goal,]), neighbor)
+        inserted = frontier$insert(getCombinedCost(locations[from,], locations[neighbor,], locations[goal,]), neighbor)
 
         # Add neighbor to path only if it was inserted in the frontier
         wasInserted = length(inserted) != 1 || inserted[[1]][1] != -1
@@ -355,7 +367,7 @@ runWheresCroc=function(makeMoves,showCroc=F,pause=1, doPlot=TRUE) {
     for (m in moveInfo$moves) {
       if (m==0) {
         if (positions[1]==positions[4]) {
-          print(paste("Congratualations! You got croc at move ",move,".",sep=""))
+          # print(paste("Congratualations! You got croc at move ",move,".",sep=""))
           return (move)
         }
       } else {
