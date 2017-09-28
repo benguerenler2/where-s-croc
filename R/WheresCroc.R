@@ -45,6 +45,17 @@ createObservations=function(readings, probs, numOfWaterHoles) {
   return (matrix)
 }
 
+# Returns a normalized state
+normalizeState=function(state) {
+  stateLength = length(state)
+  stateTotal = sum(state)
+  normalizedState = matrix(0, nrow=1, ncol=stateLength)
+  for (i in 1:stateLength) {
+    normalizedState[i] = state[i]/stateTotal
+  }
+  return (normalizedState)
+}
+
 # Use the forward algorithm to provide a distribution over the system
 # and select the waterhole where there's a highest chance the Croc is at
 getMostProbableWaterhole=function(moveInfo, readings, edges, probs) {
@@ -58,7 +69,7 @@ getMostProbableWaterhole=function(moveInfo, readings, edges, probs) {
   nextState = moveInfo$mem$prevState %*% transitions %*% observations
 
   # This turn state will become next turn previous state
-  moveInfo$mem$prevState = nextState
+  moveInfo$mem$prevState = normalizeState(nextState)
 
   return (which.max(nextState))
 }
