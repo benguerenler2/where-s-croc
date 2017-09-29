@@ -24,7 +24,7 @@ createTransitionMatrix = function(edges, numOfWaterHoles) {
   for (waterhole in 1:numOfWaterHoles){
     neighbors = getOptions(waterhole, edges)
     totalNumOfReachableWaterholes = length(getOptions(waterhole, edges))
-    prob = 1/totalNumOfReachableWaterholes # 1/4
+    prob = 1/totalNumOfReachableWaterholes
     for (neighbor in neighbors) {
       matrix[waterhole, neighbor] = prob
     }
@@ -59,9 +59,8 @@ normalizeState=function(state) {
 
 # Use the forward algorithm to provide a distribution over the system
 # and select the waterhole where there's a highest chance the Croc is at
-getMostProbableWaterhole=function(moveInfo, readings, edges, probs) {
+getMostProbableWaterhole=function(numOfWaterHoles, moveInfo, readings, edges, probs) {
   # Initialize previous state, transition, and observation matrices
-  numOfWaterHoles = dim(probs$salinity)[1]
   moveInfo$mem$prevState = getPrevState(moveInfo$mem$prevState, numOfWaterHoles)
   transitions = createTransitionMatrix(edges, numOfWaterHoles)
   observations = createObservations(readings, probs, numOfWaterHoles)
@@ -75,20 +74,48 @@ getMostProbableWaterhole=function(moveInfo, readings, edges, probs) {
   return (which.max(nextState))
 }
 
+# Return true if a backpacker has been eaten in this turn
+hasBackpackerBeenEaten=function(positions) {
+  allNumbers = isTRUE(all(positions == floor(positions)))
+  hasBeenEaten = length(positions[positions[] < 0]) > 0
+  return (allNumbers && hasBeenEaten)
+}
+
+# Return location where backpacker was eaten, and update next state with it
+getEatenBackpackerWaterhole=function(numOfWaterHoles, moveInfo, positions) {
+  goal = abs(positions[positions[] < 0][1])
+  moveInfo$mem$prevState = matrix(0, nrow=1, ncol=numOfWaterHoles)
+  moveInfo$mem$prevState[goal] = 1
+  return (goal)
+}
+
+# Given a path, return the best next move towards goal
+generateNextMove=function(path) {
+  if(isTRUE(length(path) == 1)) {
+    return (path[[1]])
+  } else {
+    return (path[[2]])
+  }
+}
+
 # TODO: Use information from backpackers to improve state knowledge
-#     - The initial previous state is not 1/40 for all waterholes. We need to check if backpackers are both 
-#        alive or not and compute accordingly (if both packares are alive, their waterholes prob is 0 and 
+#     - The initial previous state is not 1/40 for all waterholes. We need to check if backpackers are both
+#        alive or not and compute accordingly (if both packares are alive, their waterholes prob is 0 and
 #        1/38 for the rest and so on for other use-cases)
-#     - If a backpacker's position is negative, no need to compute forward algorithm, we already know
-#       where the Croc is at
 #     - If a backpacker's positions is 'NA', we need to update the previous state as we
 #       now know where the Croc was really at (on the previous turn)
 #     - How to deal with 'NA' positions that were not in the previous turn (i.e. the backpacker
 #       was eaten 5 turns ago - not previous state anymore)?
 hmmWC=function(moveInfo, readings, positions, edges, probs) {
-  # Get initial and goal positions for search
+  numOfWaterHoles = dim(probs$salinity)[1]
   from = positions[3]
-  goal = getMostProbableWaterhole(moveInfo, readings, edges, probs)
+  goal = NULL
+
+  if(hasBackpackerBeenEaten(positions)){
+    goal = getEatenBackpackerWaterhole(numOfWaterHoles, moveInfo, positions)
+  } else {
+    goal = getMostProbableWaterhole(numOfWaterHoles, moveInfo, readings, edges, probs)
+  }
 
   path = aStarSearch(from, goal, edges, getPoints())
   moveInfo$moves = c(generateNextMove(path), 0)
@@ -261,15 +288,6 @@ aStarSearch=function(from, goal, edges, locations) {
   }
 }
 
-# Given a path, return the best next move towards goal
-generateNextMove=function(path) {
-  if(isTRUE(length(path) == 1)) {
-    return (path[[1]])
-  } else {
-    return (path[[2]])
-  }
-}
-
 #' @export
 randomWC=function(moveInfo,readings,positions,edges,probs) {
   moveInfo$moves=c(sample(getOptions(positions[3],edges),1),0)
@@ -382,7 +400,7 @@ runWheresCroc=function(makeMoves,showCroc=F,pause=1, doPlot=TRUE) {
     for (m in moveInfo$moves) {
       if (m==0) {
         if (positions[1]==positions[4]) {
-          # print(paste("Congratualations! You got croc at move ",move,".",sep=""))
+          print(paste("Congratualations! You got croc at move ",move,".",sep=""))
           return (move)
         }
       } else {
