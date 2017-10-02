@@ -58,20 +58,23 @@ normalizeState=function(state) {
 }
 
 # Use the forward algorithm to provide a distribution over the system
-# and select the waterhole where there's a highest chance the Croc is at
-getMostProbableWaterhole=function(numOfWaterHoles, moveInfo, readings, edges, probs) {
+getInferedState=function(numOfWaterHoles, moveInfo, readings, edges, probs) {
   # Initialize previous state, transition, and observation matrices
-  moveInfo$mem$prevState = getPrevState(moveInfo$mem$prevState, numOfWaterHoles)
+  prevState = getPrevState(moveInfo$mem$prevState, numOfWaterHoles)
   transitions = createTransitionMatrix(edges, numOfWaterHoles)
   observations = createObservations(readings, probs, numOfWaterHoles)
 
-  # Compute next possible state
-  nextState = moveInfo$mem$prevState %*% transitions %*% observations
+  # Compute next state
+  return (prevState %*% transitions %*% observations)
+}
 
-  # This turn state will become next turn previous state
-  moveInfo$mem$prevState = normalizeState(nextState)
-
-  return (which.max(nextState))
+# Return board state given that we know a backpacker was eaten by the Croc
+# on this turn
+getEatenBackpackerState=function(numOfWaterHoles, positions) {
+  goal = abs(positions[positions[] < 0][1])
+  state = matrix(0, nrow=1, ncol=numOfWaterHoles)
+  state[goal] = 1
+  return (state)
 }
 
 # Return true if a backpacker has been eaten in this turn
@@ -79,14 +82,6 @@ hasBackpackerBeenEaten=function(positions) {
   allNumbers = isTRUE(all(positions == floor(positions)))
   hasBeenEaten = length(positions[positions[] < 0]) > 0
   return (allNumbers && hasBeenEaten)
-}
-
-# Return location where backpacker was eaten, and update next state with it
-getEatenBackpackerWaterhole=function(numOfWaterHoles, moveInfo, positions) {
-  goal = abs(positions[positions[] < 0][1])
-  moveInfo$mem$prevState = matrix(0, nrow=1, ncol=numOfWaterHoles)
-  moveInfo$mem$prevState[goal] = 1
-  return (goal)
 }
 
 # Given a path, return the best next move towards goal
@@ -102,22 +97,24 @@ generateNextMove=function(path) {
 #     - The initial previous state is not 1/40 for all waterholes. We need to check if backpackers are both
 #        alive or not and compute accordingly (if both packares are alive, their waterholes prob is 0 and
 #        1/38 for the rest and so on for other use-cases)
-#     - If a backpacker's positions is 'NA', we need to update the previous state as we
-#       now know where the Croc was really at (on the previous turn)
-#     - How to deal with 'NA' positions that were not in the previous turn (i.e. the backpacker
-#       was eaten 5 turns ago - not previous state anymore)?
 hmmWC=function(moveInfo, readings, positions, edges, probs) {
   numOfWaterHoles = dim(probs$salinity)[1]
   from = positions[3]
-  goal = NULL
+  state = NULL
 
+  # Use different strategies to determine the current state probability distribution
   if(hasBackpackerBeenEaten(positions)){
-    goal = getEatenBackpackerWaterhole(numOfWaterHoles, moveInfo, positions)
+    state = getEatenBackpackerState(numOfWaterHoles, positions)
   } else {
-    goal = getMostProbableWaterhole(numOfWaterHoles, moveInfo, readings, edges, probs)
+    state = getInferedState(numOfWaterHoles, moveInfo, readings, edges, probs)
   }
 
+  # Search
+  goal = which.max(state)
   path = aStarSearch(from, goal, edges, getPoints())
+
+  # Generate next move, pass next turn previous state
+  moveInfo$mem$prevState = normalizeState(state)
   moveInfo$moves = c(generateNextMove(path), 0)
   return (moveInfo)
 }
