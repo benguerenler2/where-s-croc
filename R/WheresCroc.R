@@ -19,14 +19,13 @@ getPrevState=function(prevState, numOfWaterHoles) {
 }
 
 # Create the transition matrix for each available waterhole
-createTransitionMatrix = function(edges, numOfWaterHoles) {
+createTransitions = function(edges, numOfWaterHoles) {
   matrix = matrix(0, nrow=numOfWaterHoles, ncol=numOfWaterHoles)
   for (waterhole in 1:numOfWaterHoles){
-    neighbors = getOptions(waterhole, edges)
-    totalNumOfReachableWaterholes = length(getOptions(waterhole, edges))
-    prob = 1/totalNumOfReachableWaterholes
-    for (neighbor in neighbors) {
-      matrix[waterhole, neighbor] = prob
+    options = getOptions(waterhole, edges)
+    totalOptions = length(options)
+    for (option in options) {
+      matrix[option, waterhole] = 1/totalOptions
     }
   }
   return (matrix)
@@ -41,7 +40,7 @@ createObservations=function(readings, probs, numOfWaterHoles) {
     salinityDNorm = dnorm(readings[1], probs$salinity[waterhole,1], probs$salinity[waterhole,2])
     phosphateDNorm = dnorm(readings[2], probs$phosphate[waterhole,1], probs$phosphate[waterhole,2])
     nitrogenDNorm = dnorm(readings[3], probs$nitrogen[waterhole,1], probs$nitrogen[waterhole,2])
-    matrix[waterhole,waterhole] = salinityDNorm * phosphateDNorm * nitrogenDNorm
+    matrix[waterhole, waterhole] = salinityDNorm * phosphateDNorm * nitrogenDNorm
   }
   return (matrix)
 }
@@ -58,10 +57,10 @@ normalizeState=function(state) {
 }
 
 # Use the forward algorithm to provide a distribution over the system
-getInferedState=function(numOfWaterHoles, moveInfo, readings, edges, probs) {
+getInferedState=function(numOfWaterHoles, prevState, readings, edges, probs) {
   # Initialize previous state, transition, and observation matrices
-  prevState = getPrevState(moveInfo$mem$prevState, numOfWaterHoles)
-  transitions = createTransitionMatrix(edges, numOfWaterHoles)
+  prevState = getPrevState(prevState, numOfWaterHoles)
+  transitions = createTransitions(edges, numOfWaterHoles)
   observations = createObservations(readings, probs, numOfWaterHoles)
 
   # Compute next state
@@ -84,6 +83,11 @@ hasBackpackerBeenEaten=function(positions) {
   return (allNumbers && hasBeenEaten)
 }
 
+# Given backpacker's position, return true if backpacker is alive, false otherwise
+isBackpackerAlive=function(position) {
+  return (isTRUE(position == floor(position)) && position > 0)
+}
+
 # Given a path, return the best next move towards goal
 generateNextMove=function(path) {
   if(isTRUE(length(path) == 1)) {
@@ -93,28 +97,25 @@ generateNextMove=function(path) {
   }
 }
 
-# TODO: Use information from backpackers to improve state knowledge
-#     - The initial previous state is not 1/40 for all waterholes. We need to check if backpackers are both
-#        alive or not and compute accordingly (if both packares are alive, their waterholes prob is 0 and
-#        1/38 for the rest and so on for other use-cases)
 hmmWC=function(moveInfo, readings, positions, edges, probs) {
-  numOfWaterHoles = dim(probs$salinity)[1]
-  from = positions[3]
+  numOfWaterHoles = 40
   state = NULL
 
   # Use different strategies to determine the current state probability distribution
   if(hasBackpackerBeenEaten(positions)){
     state = getEatenBackpackerState(numOfWaterHoles, positions)
   } else {
-    state = getInferedState(numOfWaterHoles, moveInfo, readings, edges, probs)
+    state = getInferedState(numOfWaterHoles, moveInfo$mem$prevState, readings, edges, probs)
   }
 
   # Search
+  state = normalizeState(state)
+  from = positions[3]
   goal = which.max(state)
   path = aStarSearch(from, goal, edges, getPoints())
 
   # Generate next move, pass next turn previous state
-  moveInfo$mem$prevState = normalizeState(state)
+  moveInfo$mem$prevState = state
   moveInfo$moves = c(generateNextMove(path), 0)
   return (moveInfo)
 }
@@ -397,7 +398,7 @@ runWheresCroc=function(makeMoves,showCroc=F,pause=1, doPlot=TRUE) {
     for (m in moveInfo$moves) {
       if (m==0) {
         if (positions[1]==positions[4]) {
-          print(paste("Congratualations! You got croc at move ",move,".",sep=""))
+          print(paste("Congratulations! You got croc at move ",move,".",sep=""))
           return (move)
         }
       } else {
