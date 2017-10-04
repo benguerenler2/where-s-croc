@@ -5,9 +5,9 @@
   - $mem
 
 + readings (A vector giving the salinity, phosphate and nitrogen reading from Croc sensors at his current location)
-  - [0] salinity
-  - [1] phosphate
-  - [2] nitrogen
+  - [1] salinity
+  - [2] phosphate
+  - [3] nitrogen
 
 + positions (A vector giving the positions of the two tourists and yourself. If a tourist has just been eaten by Croc that turn, the position will be multiplied by -1. If a tourist was eaten by Croc in a previous turn, then the position will be NA)
   - [0] tourist position
