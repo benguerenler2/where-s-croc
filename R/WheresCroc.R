@@ -23,9 +23,9 @@ createTransitions = function(edges, numOfWaterHoles) {
   matrix = matrix(0, nrow=numOfWaterHoles, ncol=numOfWaterHoles)
   for (waterhole in 1:numOfWaterHoles){
     options = getOptions(waterhole, edges)
-    totalOptions = length(options)
+    prob = 1/length(options)
     for (option in options) {
-      matrix[option, waterhole] = 1/totalOptions
+      matrix[option, waterhole] = prob
     }
   }
   return (matrix)
@@ -46,30 +46,29 @@ createObservations=function(readings, probs, numOfWaterHoles) {
 }
 
 # Returns a normalized state
-normalizeState=function(state) {
-  stateLength = length(state)
+normalizeState=function(state, numOfWaterHoles) {
   stateTotal = sum(state)
-  normalizedState = matrix(0, nrow=1, ncol=stateLength)
-  for (i in 1:stateLength) {
+  normalizedState = matrix(0, nrow=1, ncol=numOfWaterHoles)
+  for (i in 1:numOfWaterHoles) {
     normalizedState[i] = state[i]/stateTotal
   }
   return (normalizedState)
 }
 
 # Use the forward algorithm to provide a distribution over the system
-getInferedState=function(numOfWaterHoles, prevState, readings, edges, probs) {
+getInferedState=function(prevState, readings, edges, probs, numOfWaterHoles) {
   # Initialize previous state, transition, and observation matrices
   prevState = getPrevState(prevState, numOfWaterHoles)
   transitions = createTransitions(edges, numOfWaterHoles)
   observations = createObservations(readings, probs, numOfWaterHoles)
 
   # Compute next state
-  return (prevState %*% transitions %*% observations)
+  return (prevState %*% (transitions %*% observations))
 }
 
 # Return board state given that we know a backpacker was eaten by the Croc
 # on this turn
-getEatenBackpackerState=function(numOfWaterHoles, positions) {
+getEatenBackpackerState=function(positions, numOfWaterHoles) {
   goal = abs(positions[positions[] < 0][1])
   state = matrix(0, nrow=1, ncol=numOfWaterHoles)
   state[goal] = 1
@@ -98,24 +97,25 @@ generateNextMove=function(path) {
 }
 
 hmmWC=function(moveInfo, readings, positions, edges, probs) {
-  numOfWaterHoles = 40
-  state = NULL
+  numOfWaterHoles = dim(probs$phosphate)[1]
+  prevState = moveInfo$mem$prevState
+  currState = NULL
 
   # Use different strategies to determine the current state probability distribution
   if(hasBackpackerBeenEaten(positions)){
-    state = getEatenBackpackerState(numOfWaterHoles, positions)
+    currState = getEatenBackpackerState(positions, numOfWaterHoles)
   } else {
-    state = getInferedState(numOfWaterHoles, moveInfo$mem$prevState, readings, edges, probs)
+    currState = getInferedState(prevState, readings, edges, probs, numOfWaterHoles)
   }
 
   # Search
-  state = normalizeState(state)
+  currState = normalizeState(currState, numOfWaterHoles)
   from = positions[3]
-  goal = which.max(state)
-  path = aStarSearch(from, goal, edges, getPoints())
+  goal = which.max(currState)
+  path = bestFirstSearch(from, goal, edges, getPoints(), currState)
 
   # Generate next move, pass next turn previous state
-  moveInfo$mem$prevState = state
+  moveInfo$mem$prevState = currState
   moveInfo$moves = c(generateNextMove(path), 0)
   return (moveInfo)
 }
@@ -182,21 +182,6 @@ List <- function() {
   list(insert = insert, exists = exists)
 }
 
-# Returns the Manhattan distance between two locations
-getManhattanDistance=function(from, to) {
-  return (abs(from[1] - to[1]) + abs(from[2] - to[2]))
-}
-
-# Return the Euclidean distance between two locations
-getEuclideanDistance=function(from, to) {
-  return (sqrt((from[1] - to[1])^2 + (from[2] - to[2])^2))
-}
-
-# Return the cost of an edge + a heuristic
-getCombinedCost=function(start, neighbor, goal) {
-  return (getManhattanDistance(start, neighbor) + getEuclideanDistance(neighbor, goal))
-}
-
 # Return the neighbors of a particular node
 getNeighbors=function(node, edges) {
   neighbors = getOptions(node, edges)
@@ -238,21 +223,34 @@ generatePath=function(from, to, path) {
   return (rev(vectors))
 }
 
-# Perform A* search from current location to goal
-# Algorithm was implemented based off the following pseudo-codes:
-# 1. http://web.mit.edu/eranki/www/tutorials/search/
-# 2. https://en.wikipedia.org/wiki/A*_search_algorithm
-aStarSearch=function(from, goal, edges, locations) {
+# Add a node to the path
+addNodeToPath=function(path, from, to) {
+  path[transformNodeToString(to)] = transformNodeToString(from)
+  return (path)
+}
+
+# Return the heuristic value of going from a node to another one
+getHeuristicValue=function(from, node, neighbor, path, state) {
+  # Compute edge cost
+  neighborPath = addNodeToPath(path, node, neighbor)
+  edgeCost = length(generatePath(from, neighbor, neighborPath)) - 1
+
+  # Favor nodes which have a higher likelihood for the Croc being there
+  return (edgeCost - state[neighbor])
+}
+
+# Find goal though a best-first search
+bestFirstSearch=function(from, goal, edges, locations, state) {
   # Initialize visited, frontier, and path lists
   visited = List()
   frontier = PriorityQueue()
   path = list()
 
-  # Put the starting location on the frontier (cost 0 is fine)
+  # Put the starting location on the frontier (heuristic 0 is fine)
   frontier$insert(0, from)
 
   while (!frontier$empty()) {
-    # Get node with the least f on the frontier
+    # Get node with the least heuristic on the frontier
     node = frontier$pop()
 
     # Return the visited path + current node as path to goal
@@ -266,17 +264,13 @@ aStarSearch=function(from, goal, edges, locations) {
       if(visited$exists(neighbor)) {
         next
       } else {
-        # Temporarily save visited path towards this neighbor
-        tempPath = path
-        tempPath[transformNodeToString(neighbor)] = transformNodeToString(node)
-
-        # Attempt to add neighbor to frontier
-        inserted = frontier$insert(getCombinedCost(locations[from,], locations[neighbor,], locations[goal,]), neighbor)
+        heuristic = getHeuristicValue(from, node, neighbor, path, state)
+        inserted = frontier$insert(heuristic, neighbor)
 
         # Add neighbor to path only if it was inserted in the frontier
         wasInserted = length(inserted) != 1 || inserted[[1]][1] != -1
         if (isTRUE(wasInserted)) {
-          path[transformNodeToString(neighbor)] = transformNodeToString(node)
+          path = addNodeToPath(path, node, neighbor)
         }
       }
     }
