@@ -5,7 +5,7 @@
 # Diego Castillo - 911206-T438
 
 ###############################################
-#############Inference Related Code############
+#################Inference Code################
 ###############################################
 
 # Return the previous state for the probability of the Croc being at
@@ -56,13 +56,14 @@ createObservations=function(readings, probs, numOfWaterHoles) {
 }
 
 # Returns a normalized state
-normalizeState=function(state, numOfWaterHoles) {
-  stateTotal = sum(state)
-  normalizedState = matrix(0, nrow=1, ncol=numOfWaterHoles)
-  for (i in 1:numOfWaterHoles) {
-    normalizedState[i] = state[i]/stateTotal
+normalize=function(vector) {
+  vectorLength = length(vector)
+  vectorTotal = sum(vector)
+  normalized = matrix(0, nrow=1, ncol=vectorLength)
+  for (i in 1:vectorLength) {
+    normalized[i] = vector[i]/vectorTotal
   }
-  return (normalizedState)
+  return (normalized)
 }
 
 # Use the forward algorithm to provide a distribution over the system
@@ -118,21 +119,21 @@ hmmWC=function(moveInfo, readings, positions, edges, probs) {
   }
 
   # Search
-  currState = normalizeState(currState, numOfWaterHoles)
+  currState = normalize(currState)
   from = positions[3]
   goal = which.max(currState)
   path = bestFirstSearch(from, goal, edges)
 
   # Generate next move, pass next turn previous state
-  moveInfo$mem$prevState = currState
   moveInfo$moves = generateNextMove(path)
+  moveInfo$mem$prevState = currState
   return (moveInfo)
 }
 
-averageTest <- function(tests, showCroc = FALSE, pause = 0, doPlot = FALSE){
+averageTest <- function(tests){
   sum = 0
   for (i in 1:tests) {
-    sum=sum+runWheresCroc(hmmWC, showCroc, pause, doPlot)
+    sum=sum+runWheresCroc(hmmWC, F, 0)
     if(i%%10==0){
       print(i)
       print(sum/i)
@@ -143,7 +144,7 @@ averageTest <- function(tests, showCroc = FALSE, pause = 0, doPlot = FALSE){
 }
 
 ###############################################
-##############Search Related Code##############
+##################Search Code##################
 ###############################################
 
 # A priority queue which allows to insert elements
@@ -359,7 +360,7 @@ manualWC=function(moveInfo,readings,positions,edges,probs) {
 #' @param pause The pause period between moves. Ignore this.
 #' @return A string describing the outcome of the game.
 #' @export
-runWheresCroc=function(makeMoves,showCroc=F,pause=1, doPlot=TRUE) {
+runWheresCroc=function(makeMoves,showCroc=F,pause=1) {
   positions=sample(1:40,4) # Croc, BP1, BP2, Player
   points=getPoints()
   edges=getEdges()
@@ -385,10 +386,7 @@ runWheresCroc=function(makeMoves,showCroc=F,pause=1, doPlot=TRUE) {
     if (!is.na(positions[3]) && positions[3]==positions[1]) {
       positions[3]=-positions[3]
     }
-
-    if(doPlot) {
-      plotGameboard(points,edges,move,positions,showCroc)
-    }
+    plotGameboard(points,edges,move,positions,showCroc)
 
     Sys.sleep(pause)
 
@@ -400,7 +398,7 @@ runWheresCroc=function(makeMoves,showCroc=F,pause=1, doPlot=TRUE) {
     for (m in moveInfo$moves) {
       if (m==0) {
         if (positions[1]==positions[4]) {
-          print(paste("Congratulations! You got croc at move ",move,".",sep=""))
+          print(paste("Congratualations! You got croc at move ",move,".",sep=""))
           return (move)
         }
       } else {
