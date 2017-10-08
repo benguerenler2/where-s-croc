@@ -10,10 +10,20 @@
 
 # Return the previous state for the probability of the Croc being at
 # any of the available waterholes
-getPrevState=function(prevState, numOfWaterHoles) {
+getPrevState=function(prevState, numOfWaterHoles, positions) {
   if(isTRUE(is.null(prevState))) {
-    matrix = matrix(1/numOfWaterHoles, nrow=1, ncol=numOfWaterHoles)
-    return (matrix)
+    backpackerA = positions[1]
+    backpackerB = positions[2]
+    if (backpackerA == backpackerB) {
+      matrix = matrix(1/(numOfWaterHoles - 1), nrow=1, ncol=numOfWaterHoles)
+      matrix[backpackerA] = 0
+      return (matrix)
+    } else {
+      matrix = matrix(1/(numOfWaterHoles - 2), nrow=1, ncol=numOfWaterHoles)
+      matrix[backpackerA] = 0
+      matrix[backpackerB] = 0
+      return (matrix)
+    }
   }
   return (prevState)
 }
@@ -56,9 +66,9 @@ normalizeState=function(state, numOfWaterHoles) {
 }
 
 # Use the forward algorithm to provide a distribution over the system
-getInferedState=function(prevState, readings, edges, probs, numOfWaterHoles) {
+getInferedState=function(prevState, readings, edges, probs, numOfWaterHoles, positions) {
   # Initialize previous state, transition, and observation matrices
-  prevState = getPrevState(prevState, numOfWaterHoles)
+  prevState = getPrevState(prevState, numOfWaterHoles, positions)
   transitions = createTransitions(edges, numOfWaterHoles)
   observations = createObservations(readings, probs, numOfWaterHoles)
 
@@ -105,7 +115,7 @@ hmmWC=function(moveInfo, readings, positions, edges, probs) {
   if(hasBackpackerBeenEaten(positions)){
     currState = getEatenBackpackerState(positions, numOfWaterHoles)
   } else {
-    currState = getInferedState(prevState, readings, edges, probs, numOfWaterHoles)
+    currState = getInferedState(prevState, readings, edges, probs, numOfWaterHoles, positions)
   }
 
   # Search
