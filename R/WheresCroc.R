@@ -122,7 +122,7 @@ hmmWC=function(moveInfo, readings, positions, edges, probs) {
   currState = normalize(currState)
   from = positions[3]
   goal = which.max(currState)
-  path = bestFirstSearch(from, goal, edges)
+  path = bfs(from, goal, edges)
 
   # Generate next move, pass next turn previous state
   moveInfo$moves = generateNextMove(path)
@@ -147,48 +147,25 @@ averageTest <- function(tests){
 ##################Search Code##################
 ###############################################
 
-# A priority queue which allows to insert elements
-# and order them by priority
-# Source: http://rosettacode.org/wiki/Priority_queue#R
-PriorityQueue <- function() {
-  queueKeys <<- queueValues <<- NULL
-  insert <- function(key, value) {
-    # If node already exists on queue, and this new addition is better,
-    # delete previous one and insert this new one instead
-    index = getValueIndex(value)
-    if(length(index) > 0) {
-      if(isTRUE(key < queueKeys[[index]])) {
-        queueKeys <<- queueKeys[-index]
-        queueValues <<- queueValues[-index]
-      } else {
-        # Ignore it, we already have a cheaper path
-        return (-1)
-      }
-    }
-
-    # Insert new value in queue
-    temp <- c(queueKeys, key)
-    ord <- order(temp)
-    queueKeys <<- temp[ord]
-    queueValues <<- c(queueValues, list(value))[ord]
-  }
+# A FIFO queue
+Queue <- function() {
+  queueValues <<- NULL
+  insert <- function(v) queueValues <<- c(queueValues, list(v))
+  exists <- function(v) isTRUE(which(queueValues %in% list(v) == TRUE) > 0)
   pop <- function() {
     head <- queueValues[[1]]
     queueValues <<- queueValues[-1]
-    queueKeys <<- queueKeys[-1]
     return (head)
   }
-  empty <- function() length(queueKeys) == 0
-  getValueIndex <- function(value) which(queueValues %in% list(value) == TRUE)
-  list(insert = insert, pop = pop, empty = empty)
+  empty <- function() length(queueValues) == 0
+  list(insert = insert, pop = pop, exists = exists, empty = empty)
 }
 
-# A simple lists which allows to insert elements on it
-# and verity if a particular element exists or not
+# A simple lists
 List <- function() {
   listValues <<- NULL
-  insert <- function(value) listValues <<- c(listValues, list(value))
-  exists <- function(value) isTRUE(which(listValues %in% list(value) == TRUE) > 0)
+  insert <- function(v) listValues <<- c(listValues, list(v))
+  exists <- function(v) isTRUE(which(listValues %in% list(v) == TRUE) > 0)
   list(insert = insert, exists = exists)
 }
 
@@ -239,53 +216,42 @@ addNodeToPath=function(path, from, to) {
   return (path)
 }
 
-# Return the heuristic value of going from a node to another one
-getHeuristicValue=function(from, node, neighbor, path) {
-  # Compute edge cost
-  neighborPath = addNodeToPath(path, node, neighbor)
-  edgeCost = length(generatePath(from, neighbor, neighborPath)) - 1
-
-  return (edgeCost)
-}
-
-# Find goal though a best-first search
-bestFirstSearch=function(from, goal, edges) {
+# Find goal through a breadth-first search
+# Pseudo-code from: https://en.wikipedia.org/wiki/Breadth-first_search
+bfs=function(from, goal, edges) {
   # Initialize visited, frontier, and path lists
   visited = List()
-  frontier = PriorityQueue()
+  frontier = Queue()
   path = list()
 
-  # Put the starting location on the frontier (heuristic 0 is fine)
-  frontier$insert(0, from)
-
-  while (!frontier$empty()) {
-    # Get node with the least heuristic on the frontier
-    node = frontier$pop()
-
-    # Return the visited path + current node as path to goal
-    if(isGoal(node, goal)) {
-      return (generatePath(from, goal, path))
-    }
-
-    neighbors = getNeighbors(node, edges)
-    for (neighbor in neighbors) {
-      # Only search neighbors which haven't already being visited
-      if(visited$exists(neighbor)) {
-        next
-      } else {
-        heuristic = getHeuristicValue(from, node, neighbor, path)
-        inserted = frontier$insert(heuristic, neighbor)
-
-        # Add neighbor to path only if it was inserted in the frontier
-        wasInserted = length(inserted) != 1 || inserted[[1]][1] != -1
-        if (isTRUE(wasInserted)) {
+  if(isGoal(from, goal)) {
+    path = addNodeToPath(path, from, goal)
+    return (generatePath(from, goal, path))
+  } else {
+    # Put the starting location on the frontier
+    frontier$insert(from)
+    while (!frontier$empty()) {
+      # Expand node in front of the frontier
+      node = frontier$pop()
+      neighbors = getNeighbors(node, edges)
+      for (neighbor in neighbors) {
+        # Only search neighbors that are not in the frontier nor visited
+        if(!frontier$exists(neighbor) && !visited$exists(neighbor)) {
           path = addNodeToPath(path, node, neighbor)
+
+          # Return the visited path + current node as path to goal
+          if(isGoal(neighbor, goal)) {
+            return (generatePath(from, goal, path))
+          }
+
+          # Add node to frontier
+          frontier$insert(neighbor)
         }
       }
-    }
 
-    # Keep track of visited nodes
-    visited$insert(node)
+      # Keep track of visited nodes
+      visited$insert(node)
+    }
   }
 }
 
