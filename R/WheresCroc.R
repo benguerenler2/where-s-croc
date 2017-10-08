@@ -73,7 +73,7 @@ getInferedState=function(prevState, readings, edges, probs, numOfWaterHoles, pos
   observations = createObservations(readings, probs, numOfWaterHoles)
 
   # Compute next state
-  return (prevState %*% (transitions %*% observations))
+  return (prevState %*% transitions %*% observations)
 }
 
 # Return board state given that we know a backpacker was eaten by the Croc
@@ -92,18 +92,17 @@ hasBackpackerBeenEaten=function(positions) {
   return (allNumbers && hasBeenEaten)
 }
 
-# Given backpacker's position, return true if backpacker is alive, false otherwise
-isBackpackerAlive=function(position) {
-  return (isTRUE(position == floor(position)) && position > 0)
-}
-
 # Given a path, return the best next move towards goal
 generateNextMove=function(path) {
-  if(isTRUE(length(path) == 1)) {
-    return (path[[1]])
-  } else {
-    return (path[[2]])
+  if(length(path) == 1) {
+    return (c(path[[1]], 0))
   }
+
+  if (length(path) == 2) {
+    return (c(path[[2]], 0))
+  }
+
+  return (c(path[[2]], path[[3]]))
 }
 
 hmmWC=function(moveInfo, readings, positions, edges, probs) {
@@ -122,11 +121,11 @@ hmmWC=function(moveInfo, readings, positions, edges, probs) {
   currState = normalizeState(currState, numOfWaterHoles)
   from = positions[3]
   goal = which.max(currState)
-  path = bestFirstSearch(from, goal, edges, getPoints(), currState)
+  path = bestFirstSearch(from, goal, edges)
 
   # Generate next move, pass next turn previous state
   moveInfo$mem$prevState = currState
-  moveInfo$moves = c(generateNextMove(path), 0)
+  moveInfo$moves = generateNextMove(path)
   return (moveInfo)
 }
 
@@ -240,17 +239,16 @@ addNodeToPath=function(path, from, to) {
 }
 
 # Return the heuristic value of going from a node to another one
-getHeuristicValue=function(from, node, neighbor, path, state) {
+getHeuristicValue=function(from, node, neighbor, path) {
   # Compute edge cost
   neighborPath = addNodeToPath(path, node, neighbor)
   edgeCost = length(generatePath(from, neighbor, neighborPath)) - 1
 
-  # Favor nodes which have a higher likelihood for the Croc being there
-  return (edgeCost - state[neighbor])
+  return (edgeCost)
 }
 
 # Find goal though a best-first search
-bestFirstSearch=function(from, goal, edges, locations, state) {
+bestFirstSearch=function(from, goal, edges) {
   # Initialize visited, frontier, and path lists
   visited = List()
   frontier = PriorityQueue()
@@ -274,7 +272,7 @@ bestFirstSearch=function(from, goal, edges, locations, state) {
       if(visited$exists(neighbor)) {
         next
       } else {
-        heuristic = getHeuristicValue(from, node, neighbor, path, state)
+        heuristic = getHeuristicValue(from, node, neighbor, path)
         inserted = frontier$insert(heuristic, neighbor)
 
         # Add neighbor to path only if it was inserted in the frontier
